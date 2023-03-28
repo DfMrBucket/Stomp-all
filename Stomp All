@@ -1,0 +1,125 @@
+local rs = game:GetService("RunService")
+
+local Players = game:GetService("Players")
+
+if not Players.LocalPlayer then
+
+  Players:GetPropertyChangedSignal("LocalPlayer"):Wait()
+
+end
+
+local lp = Players.LocalPlayer
+
+local connections = {}
+
+local function getchar()
+
+  return lp.Character or lp.CharacterAdded:Wait()
+
+end
+
+local MainEvent = game:GetService('ReplicatedStorage'):WaitForChild("MainEvent")
+
+local state = false
+
+local function initchar(char)
+
+  local KO = char:WaitForChild("BodyEffects"):WaitForChild("KO")
+
+  local Humanoid = char:WaitForChild("Humanoid")
+
+  connections[Humanoid] = Humanoid:GetPropertyChangedSignal("Health"):Connect(function()
+
+     if KO.Value and Humanoid.Health >= 2 then
+
+        if state then
+
+           repeat task.wait() until not state
+
+           if not KO.Value then return end
+
+        end
+
+        state = true
+
+        local oldpos = getchar():WaitForChild("HumanoidRootPart").CFrame
+
+        repeat
+
+           if char then
+
+              getchar():WaitForChild("HumanoidRootPart").CFrame = CFrame.new(char:WaitForChild("Head").CFrame.Position) * CFrame.new(0,3,0)
+
+           end
+
+           rs.Heartbeat:Wait()
+
+           MainEvent:FireServer('Stomp')
+
+        until not (Humanoid or Humanoid.Parent or KO.Value) or Humanoid.Health <= 2
+
+        getchar():WaitForChild("HumanoidRootPart").CFrame = oldpos
+
+        state = false
+
+     end
+
+  end)
+
+end
+
+local function initplayer(plr)
+
+  if not connections[plr] then
+
+     connections[plr] = plr.CharacterAdded:Connect(initchar)
+
+  end
+
+  local plrchar = plr.Character
+
+  if plrchar then
+
+     initchar(plrchar)
+
+  end
+
+end
+
+connections["PlayerAdded"] = Players.PlayerAdded:Connect(initplayer)
+
+connections["PlayerRemoving"] = Players.PlayerRemoving:Connect(function(plr)
+
+  if connections[plr] then
+
+     connections[plr]:Disconnect()
+
+     connections[plr] = nil
+
+  end
+
+end)
+
+for i,v in next, Players:GetPlayers() do
+
+  if v ~= lp then
+
+     initplayer(v)
+
+  end
+
+end
+
+getgenv().toggle = function()
+
+  for i,v in next, connections do
+
+     v:Disconnect()
+
+     print("Disconnecting",i,v)
+
+  end
+
+  getgenv().toggle = nil
+
+end
